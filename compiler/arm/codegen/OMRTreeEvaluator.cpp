@@ -617,7 +617,7 @@ TR::Register *OMR::ARM::TreeEvaluator::iwrtbarEvaluator(TR::Node *node, TR::Code
 
    if (needSync && TR::Compiler->target.cpu.id() != TR_DefaultARMProcessor)
       {
-      generateInstruction(cg, (TR::Compiler->target.cpu.id() == TR_ARMv6) ? ARMOp_dmb_v6 : ARMOp_dmb, node);
+      generateInstruction(cg, (TR::Compiler->target.cpu.id() == TR_ARMv6) ? ARMOp_dmb_v6 : ARMOp_dmb, node);   // XXX what about newer than v6? What are these two instructions?
       }
 
    generateMemSrc1Instruction(cg, ARMOp_str, node, tempMR, sourceRegister);
@@ -933,11 +933,15 @@ TR::Register *OMR::ARM::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
    bool stopUsingCopyReg1, stopUsingCopyReg2, stopUsingCopyReg3, stopUsingCopyReg4, stopUsingCopyReg5 = false;
    TR::SymbolReference *arrayCopyHelper;
    FILE *outFile;
-
+   
+   bool needWriteBarrier = cg->comp()->getOptions()->needWriteBarriers();
    bool isSimpleCopy = (node->getNumChildren() == 3);
-   if(!isSimpleCopy)
+   if(!isSimpleCopy && needWriteBarrier)
       {
-      TR_ASSERT(0,"Only simple array copies currently implemented on arm");
+      // printf("needWriteBarrier is %d\n",needWriteBarrier);
+      TR_ASSERT(0,"Only simple array copies currently implemented on arm, so can't handle object arrays with write barriers");
+      // If we get here then we're running without assert and the code is going to be bad. Warn the user
+      fprintf(stderr,"WARNING: ARM codegen can't handle optimised array copies when write barriers are needed. Try using -Xgcpolicy:optthruput\n");
       }
 
    if (isSimpleCopy)
@@ -950,7 +954,6 @@ TR::Register *OMR::ARM::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
       }
    else
      {
-      TR_ASSERT(0,"Only simple array copies implemented for arm");
       srcObjNode = node->getChild(0);
       dstObjNode = node->getChild(1);
       srcAddrNode = node->getChild(2);

@@ -104,7 +104,7 @@ endif
 # option, it is silently ignored.
 GLOBAL_ASFLAGS+=-noexecstack
 
-ARM_ARCH_FLAGS=-march=armv6 -marm -mfpu=vfp -mfloat-abi=hard
+ARM_ARCH_FLAGS ?= -march=armv6 -marm -mfpu=vfp -mfloat-abi=hard
 
 ifeq (ppc,$(OMR_HOST_ARCH))
     ifeq (gcc,$(OMR_TOOLCHAIN))
