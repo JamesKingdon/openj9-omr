@@ -115,6 +115,7 @@
 /**
  * This spec targets ARM processors.
  */
+#undef OMR_ARCH_AARCH64
 #undef OMR_ARCH_ARM
 
 /**

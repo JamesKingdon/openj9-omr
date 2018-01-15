@@ -68,6 +68,9 @@ endif
 ifneq (,$(findstring linux_390,$(SPEC)))
   include $(CONFIG_INCL_DIR)/configure_linux_390.mk
 endif
+ifneq (,$(findstring linux_aarch64,$(SPEC)))
+  include $(CONFIG_INCL_DIR)/configure_linux_aarch64.mk
+endif
 ifneq (,$(findstring linux_arm,$(SPEC)))
   include $(CONFIG_INCL_DIR)/configure_linux_arm.mk
 endif

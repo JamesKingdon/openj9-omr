@@ -26,8 +26,18 @@
 #include "omrcomp.h"
 #include "omrutilbase.h"
 
-#if defined(LINUX) && defined(OMR_ARCH_ARM)
+#if defined(LINUX) && (defined(OMR_ARCH_ARM) || defined(OMR_ARCH_AARCH64))
 #include <time.h>
+#endif
+
+#if !defined(LINUX)
+#error "linux should be defined"
+#else
+#warning "linux is defined"
+#endif
+
+#if defined(OMR_ARCH_AARCH64)
+#warning "aarch64 defined"
 #endif
 
 uint64_t
@@ -37,6 +47,15 @@ getTimebase(void)
 
 #if defined(_MSC_VER)
 	tsc = __rdtsc();
+
+#elif defined(LINUX) && defined(OMR_ARCH_AARCH64)
+		/* For now, use the system nano clock */
+	#define J9TIME_NANOSECONDS_PER_SECOND	J9CONST_U64(1000000000)
+		struct timespec ts;
+		if (0 == clock_gettime(CLOCK_MONOTONIC, &ts)) {
+			tsc = ((uint64_t)ts.tv_sec * J9TIME_NANOSECONDS_PER_SECOND) + (uint64_t)ts.tv_nsec;
+		}
+
 #elif defined(J9X86) || defined(J9HAMMER)
 	/* Cannot use "=A", as we want to read eax:edx not just rax on x86_64 */
 	uint32_t lower;
@@ -88,6 +107,7 @@ getTimebase(void)
 	if (0 == clock_gettime(CLOCK_MONOTONIC, &ts)) {
 		tsc = ((uint64_t)ts.tv_sec * J9TIME_NANOSECONDS_PER_SECOND) + (uint64_t)ts.tv_nsec;
 	}
+
 #else
 #error "Unsupported platform"
 #endif

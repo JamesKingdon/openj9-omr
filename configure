@@ -683,6 +683,7 @@ OMR_GC_COMPRESSED_POINTERS
 OMR_ENV_DATA64
 OMR_ARCH_S390
 OMR_ARCH_X86
+OMR_ARCH_AARCH64
 OMR_ARCH_ARM
 OMR_ARCH_POWER
 OMR_PORT_ASYNC_HANDLER
@@ -857,6 +858,7 @@ enable_OMR_GC_STACCATO
 enable_OMR_GC_VLHGC
 enable_OMR_PORT_ASYNC_HANDLER
 enable_OMR_ARCH_POWER
+enable_OMR_ARCH_AARCH64
 enable_OMR_ARCH_ARM
 enable_OMR_ARCH_X86
 enable_OMR_ARCH_S390
@@ -1622,6 +1624,7 @@ Optional Features:
   --enable-OMR_PORT_ASYNC_HANDLER
 
   --enable-OMR_ARCH_POWER
+  --enable-OMR_ARCH_AARCH64
   --enable-OMR_ARCH_ARM
   --enable-OMR_ARCH_X86
   --enable-OMR_ARCH_S390
@@ -6124,6 +6127,25 @@ else
 
 fi
 
+# Check whether --enable-OMR_ARCH_AARCH64 was given.
+$as_echo "checking for aarch64" >&6
+if test "${enable-OMR_ARCH_AARCH64+set}" = set; then :
+  $as_echo "aarch64 option passed, checking $enable_OMR_ARCH_AARCH64" >&6
+  enableval=$enable_OMR_ARCH_AARCH64; if test "x${enableval}" = xyes; then :
+  OMR_ARCH_AARCH64=1
+
+   $as_echo "#define OMR_ARCH_AARCH64 1" >>confdefs.h
+
+else
+  OMR_ARCH_AARCH64=0
+
+
+fi
+else
+  OMR_ARCH_AARCH64=0
+
+
+fi
 
 # Check whether --enable-OMR_ARCH_ARM was given.
 if test "${enable_OMR_ARCH_ARM+set}" = set; then :
@@ -8787,5 +8809,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-
-

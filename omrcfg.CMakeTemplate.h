@@ -113,6 +113,7 @@
 /**
  * This spec targets ARM processors.
  */
+#cmakedefine OMR_ARCH_AARCH64
 #cmakedefine OMR_ARCH_ARM
 
 /**
