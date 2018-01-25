@@ -6129,7 +6129,7 @@ fi
 
 # Check whether --enable-OMR_ARCH_AARCH64 was given.
 $as_echo "checking for aarch64" >&6
-if test "${enable-OMR_ARCH_AARCH64+set}" = set; then :
+if test "${enable_OMR_ARCH_AARCH64+set}" = set; then :
   $as_echo "aarch64 option passed, checking $enable_OMR_ARCH_AARCH64" >&6
   enableval=$enable_OMR_ARCH_AARCH64; if test "x${enableval}" = xyes; then :
   OMR_ARCH_AARCH64=1
