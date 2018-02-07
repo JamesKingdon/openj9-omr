@@ -936,13 +936,13 @@ TR::Register *OMR::ARM::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
    
    bool needWriteBarrier = cg->comp()->getOptions()->needWriteBarriers();
    bool isSimpleCopy = (node->getNumChildren() == 3);
-   if(!isSimpleCopy && needWriteBarrier)
-      {
-      // printf("needWriteBarrier is %d\n",needWriteBarrier);
-      TR_ASSERT(0,"Only simple array copies currently implemented on arm, so can't handle object arrays with write barriers");
-      // If we get here then we're running without assert and the code is going to be bad. Warn the user
-      fprintf(stderr,"WARNING: ARM codegen can't handle optimised array copies when write barriers are needed. Try using -Xgcpolicy:optthruput\n");
-      }
+   // if(!isSimpleCopy && needWriteBarrier)
+   //    {
+   //    // printf("needWriteBarrier is %d\n",needWriteBarrier);
+   //    TR_ASSERT(0,"Only simple array copies currently implemented on arm, so can't handle object arrays with write barriers");
+   //    // If we get here then we're running without assert and the code is going to be bad. Warn the user
+   //    fprintf(stderr,"WARNING: ARM codegen can't handle optimised array copies when write barriers are needed. Try using -Xgcpolicy:optthruput\n");
+   //    }
 
    if (isSimpleCopy)
       {
@@ -988,6 +988,14 @@ TR::Register *OMR::ARM::TreeEvaluator::arraycopyEvaluator(TR::Node *node, TR::Co
                                    node, (uintptr_t)arrayCopyHelper->getMethodAddress(),
                                    deps,
                                    arrayCopyHelper);
+                                   
+#ifdef J9_PROJECT_SPECIFIC
+   if (!isSimpleCopy)
+      {
+      TR::TreeEvaluator::genWrtbarForArrayCopy(node, srcObjReg, dstObjReg, cg);
+      }
+#endif
+                                   
 
    if (srcObjNode != NULL)
       cg->decReferenceCount(srcObjNode);
