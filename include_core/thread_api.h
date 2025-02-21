@@ -744,6 +744,9 @@ omrthread_monitor_flush_destroyed_monitor_list(omrthread_t self);
 intptr_t
 omrthread_monitor_enter(omrthread_monitor_t monitor);
 
+void omrthread_monitor_setJbkDebug(omrthread_monitor_t monitor, int x);
+
+
 /**
 * @brief
 * @param monitor
@@ -1430,6 +1433,7 @@ struct J9ThreadLibrary;
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
+
 
 /*
  * @brief Control write access to memory containing dynamically generated code.

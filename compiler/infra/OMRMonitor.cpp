@@ -101,6 +101,8 @@ OMR::Monitor::enter()
 #endif /* defined(OMR_OS_WINDOWS) */
    }
 
+
+
 int32_t
 OMR::Monitor::exit()
    {
@@ -119,3 +121,11 @@ OMR::Monitor::getName()
    {
    return _name;
    }
+
+
+void
+OMR::Monitor::setJbkDebug(int x)
+   {
+   _monitor.setJbkDebug(x);
+   }
+   

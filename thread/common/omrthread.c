@@ -4558,6 +4558,8 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	ASSERT(monitor);
 	ASSERT(FREE_TAG != monitor->count);
 
+	if (monitor->jbkDebug) fprintf(stderr, "wait_orig, thread %lX\n", (long int)self);
+
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
 		return J9THREAD_ILLEGAL_MONITOR_STATE;
@@ -4580,6 +4582,8 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 
 	THREAD_LOCK(self, CALLER_MONITOR_WAIT1);
 	ASSERT(0 == self->monitor);
+
+	if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX inside thread lock\n", (long int)self);
 
 	/*
 	 * Before we wait, check if we've already been interrupted
@@ -4608,6 +4612,9 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	self->monitor = monitor;
 
 	THREAD_UNLOCK(self);
+
+	if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX after thread unlock\n", (long int)self);
+
 
 #if defined(OMR_THR_JLM_HOLD_TIMES)
 	UPDATE_JLM_MON_WAIT(self, monitor);
@@ -4681,6 +4688,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 		/*
 		 * WAIT UNTIL NOTIFIED, NO TIMEOUT
 		 */
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX about to loop\n", (long int)self);
 
 		ASSERT_MONITOR_UNOWNED_IF_NOT_3TIER(monitor);
 		OMROSCOND_WAIT(MONITOR_WAIT_CONDITION(self,monitor), monitor->mutex);
@@ -4696,6 +4704,8 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 			}
 			THREAD_UNLOCK(self);
 		OMROSCOND_WAIT_LOOP();
+
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX out of loop\n", (long int)self);
 	}
 
 	/* DONE WAITING AT THIS POINT */
@@ -4760,18 +4770,24 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	THREAD_UNLOCK(self);
 
 #ifdef OMR_THR_THREE_TIER_LOCKING
+	if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX calling monitor_enter_three_tier...\n", (long int)self);
+
 	if (monitor_enter_three_tier(
 			self, monitor,
 			(BOOLEAN)((interruptible & J9THREAD_FLAG_ABORTABLE)? SET_ABORTABLE: DONT_SET_ABORTABLE))
 		== J9THREAD_INTERRUPTED_MONITOR_ENTER
 	) {
 		/* we don't own the monitor */
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX ret int mon enter\n", (long int)self);
+
 		return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 	}
 #else
 	monitor->owner = self;
 	UPDATE_JLM_MON_ENTER(self, monitor, !IS_RECURSIVE_ENTER, IS_SLOW_ENTER);
 #endif
+	if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX resetting count from %lu to %ld\n", (long int)self, monitor->count, count);
+
 	monitor->count = count;
 
 	ASSERT(monitor->owner == self);
@@ -4786,18 +4802,23 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	ASSERT(NULL == self->next);
 
 	if (priorityinterrupted) {
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX ret P INT\n", (long int)self);
 		return J9THREAD_PRIORITY_INTERRUPTED;
 	}
 	if (notified) {
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX ret 0\n", (long int)self);
 		return 0;
 	}
 	if (interrupted) {
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX ret INT\n", (long int)self);
 		return J9THREAD_INTERRUPTED;
 	}
 	if (timedOut) {
+		if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX ret timeout\n", (long int)self);
 		return J9THREAD_TIMED_OUT;
 	}
 	ASSERT(0);
+	if (monitor->jbkDebug) fprintf(stderr, "wait_orig, %lX shouldn't get here\n", (long int)self);
 	return 0;
 }
 
@@ -4818,6 +4839,8 @@ monitor_wait_three_tier(omrthread_t self, omrthread_monitor_t monitor,
 
 	ASSERT(monitor);
 	ASSERT(FREE_TAG != monitor->count);
+
+	if (monitor->jbkDebug) fprintf(stderr, "wait_3T, thread %lX\n", (long int)self);
 
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
@@ -5122,10 +5145,19 @@ omrthread_monitor_notify(omrthread_monitor_t monitor)
 intptr_t
 omrthread_monitor_notify_all(omrthread_monitor_t monitor)
 {
+	// fprintf(stderr, "omrthread_monitor_notify_all\n");
 	return monitor_notify_one_or_all(monitor, NOTIFY_ALL);
 }
 
-
+void omrthread_monitor_setJbkDebug(omrthread_monitor_t monitor, int x)
+{
+	if (x) {
+		fprintf(stderr, "enabling monitor debug\n");
+	} else {
+		fprintf(stderr, "disabling monitor debug\n");
+	}
+	monitor->jbkDebug = x;
+}
 
 /**
  * Signal one or all threads waiting on the monitor.
@@ -5150,8 +5182,10 @@ monitor_notify_one_or_all(omrthread_monitor_t monitor, int notifyall)
 #if defined(OMR_THR_THREE_TIER_LOCKING)
 	if (self->library->flags & J9THREAD_LIB_FLAG_FAST_NOTIFY) {
 		rc = monitor_notify_three_tier(self, monitor, notifyall);
+		fprintf(stderr, "N3T rc=%ld\n", rc);
 	} else {
 		rc = monitor_notify_original(self, monitor, notifyall);
+		// fprintf(stderr, "NORIG rc=%ld\n", rc);							// This is the path I see on aarch64
 	}
 #else
 	rc = monitor_notify_original(self, monitor, notifyall);
@@ -5176,6 +5210,10 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	ASSERT(self);
 	ASSERT(monitor);
 
+	if (monitor->jbkDebug) {
+		fprintf(stderr, "monitor_notify_original, thread=%llX all=%d\n", (unsigned long long)self, notifyall);
+	}
+
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
 		return J9THREAD_ILLEGAL_MONITOR_STATE;
@@ -5195,11 +5233,15 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	while (next) {
 		queue = next;
 		next = queue->next;
+		if (monitor->jbkDebug) fprintf(stderr, "checking thread %llX\n", (long long int)queue);
 		THREAD_LOCK(queue, CALLER_NOTIFY_ONE_OR_ALL);
 		if (queue->flags & J9THREAD_FLAG_WAITING) {
+			if (monitor->jbkDebug) fprintf(stderr, "calling threadNotify\n");
 			threadNotify(queue);
 			Trc_THR_ThreadMonitorNotifyThreadNotified(self, queue, monitor);
 			someoneNotified = 1;
+		} else {
+			if (monitor->jbkDebug) fprintf(stderr, "not waiting\n");
 		}
 		THREAD_UNLOCK(queue);
 
@@ -5223,6 +5265,10 @@ monitor_notify_three_tier(omrthread_t self, omrthread_monitor_t monitor, int not
 
 	ASSERT(self);
 	ASSERT(monitor);
+
+	if (monitor->jbkDebug) {
+		fprintf(stderr, "monitor_notify_3T, thread=%llX all=%d\n", (unsigned long long)self, notifyall);
+	}
 
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
@@ -5359,6 +5405,7 @@ allocate_monitor_pool(omrthread_library_t lib)
 		entry->owner = (omrthread_t)(entry + 1);
 		/* entry->waiting = entry->blocked = NULL; */ /* (unnecessary) */
 		entry->flags = J9THREAD_MONITOR_MUTEX_UNINITIALIZED;
+		entry->jbkDebug = 0;
 	}
 	/* initialize the last monitor */
 	entry->count = FREE_TAG;
@@ -5537,8 +5584,13 @@ monitor_notify_all_migration(omrthread_monitor_t monitor)
 	omrthread_t waiting, wtail;
 	omrthread_t notifyAllWaiting, nawtail;
 
+	if (monitor->jbkDebug) fprintf(stderr, "monitor_notify_all_migration\n");
+
 	notifyAllWaiting = monitor->notifyAllWaiting;
 	waiting = monitor->waiting;
+
+	if (monitor->jbkDebug) fprintf(stderr, "notifyAllWaiting %llX, waiting %llX\n", (long long int)notifyAllWaiting, (long long int)waiting);
+
 	if (notifyAllWaiting) {
 		/* Append the waiters to those currently notifyAll'ed */
 		nawtail = notifyAllWaiting->prev;

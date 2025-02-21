@@ -57,6 +57,7 @@ class Monitor
    int32_t num_waiting() { TR_UNIMPLEMENTED(); return 0; }
    char const *getName();
    bool init(const char *name);
+   void setJbkDebug(int x);
 
 #if defined(J9ZOS390) || defined(AIXPPC)
    // xlc cannot handle private delete operator
