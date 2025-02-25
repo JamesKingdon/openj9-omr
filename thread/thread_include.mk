@@ -150,6 +150,7 @@ define WRITE_COMMON_THREAD_EXPORTS
 @echo omrthread_monitor_destroy_nolock >>$@
 @echo omrthread_monitor_flush_destroyed_monitor_list >>$@
 @echo omrthread_monitor_enter >>$@
+@echo omrthread_monitor_setJbkDebug >>$@
 @echo omrthread_monitor_get_name >>$@
 @echo omrthread_monitor_enter_abortable_using_threadId >>$@
 @echo omrthread_monitor_enter_using_threadId >>$@

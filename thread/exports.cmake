@@ -51,6 +51,7 @@ omr_add_exports(j9thr_obj
 	omrthread_monitor_destroy_nolock
 	omrthread_monitor_flush_destroyed_monitor_list
 	omrthread_monitor_enter
+	omrthread_monitor_setJbkDebug
 	omrthread_monitor_get_name
 	omrthread_monitor_enter_abortable_using_threadId
 	omrthread_monitor_enter_using_threadId
