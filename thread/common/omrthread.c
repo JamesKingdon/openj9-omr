@@ -3980,6 +3980,9 @@ static intptr_t
 monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN isAbortable)
 {
 	int blockedCount = 0;
+
+	if (monitor->jbkDebug) fprintf(stderr, "monitor_enter_three_tier, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+
 #if defined(OMR_THR_MCS_LOCKS)
 	omrthread_mcs_node_t mcsNode = omrthread_mcs_node_allocate(self);
 #endif /* defined(OMR_THR_MCS_LOCKS) */
@@ -3998,6 +4001,8 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 		if (0 == omrthread_spinlock_acquire(self, monitor))
 #endif /* defined(OMR_THR_MCS_LOCKS) */
 		{
+			if (monitor->jbkDebug) fprintf(stderr, "me3t aquire, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+
 			monitor->owner = self;
 			monitor->count = 1;
 			ASSERT(monitor->spinlockState != J9THREAD_MONITOR_SPINLOCK_UNOWNED);
@@ -4009,6 +4014,8 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 #if !defined(OMR_THR_MCS_LOCKS)
 		/* For MCS locks, J9THREAD_MONITOR_SPINLOCK_EXCEEDED is unused. */
 		if (J9THREAD_MONITOR_SPINLOCK_UNOWNED == omrthread_spinlock_swapState(monitor, J9THREAD_MONITOR_SPINLOCK_EXCEEDED)) {
+			if (monitor->jbkDebug) fprintf(stderr, "me3t exceeded, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+
 			MONITOR_UNLOCK(monitor);
 			monitor->owner = self;
 			monitor->count = 1;
@@ -4033,6 +4040,9 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 #if defined(OMR_THR_MCS_LOCKS)
 				omrthread_mcs_node_free(self, mcsNode);
 #endif /* defined(OMR_THR_MCS_LOCKS) */
+				// if (monitor->jbkDebug) 
+				fprintf(stderr, "me3t interrupted return\n");
+
 				return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 			}
 		}
@@ -4075,6 +4085,8 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 #if defined(OMR_THR_MCS_LOCKS)
 				omrthread_mcs_node_free(self, mcsNode);
 #endif /* defined(OMR_THR_MCS_LOCKS) */
+				fprintf(stderr, "me3t interrupted return 2\n");
+
 				return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 			}
 			THREAD_UNLOCK(self);
@@ -4100,13 +4112,20 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 			if (self->flags & J9THREAD_FLAG_ABORTED) {
 				THREAD_UNLOCK(self);
 				monitor_exit(self, monitor);
+
+				fprintf(stderr, "me3t interrupted return 3\n");
+
 				return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 			}
 		}
 		THREAD_UNLOCK(self);
 	}
 
+	if (monitor->jbkDebug) fprintf(stderr, "before UPDATE_JLM..., self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+
 	UPDATE_JLM_MON_ENTER(self, monitor, !IS_RECURSIVE_ENTER, (blockedCount > 0));
+
+	if (monitor->jbkDebug) fprintf(stderr, "after UPDATE_JLM..., self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 
 	ASSERT(!(self->flags & J9THREAD_FLAG_BLOCKED));
 	ASSERT(0 == self->monitor);
@@ -4335,8 +4354,15 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 	ASSERT(self);
 	ASSERT(0 == self->monitor);
 
+	if (monitor->jbkDebug) fprintf(stderr, "monitor_exit, self %llx, owner %llx, count %lu\n", (long long)self, (long long)monitor->owner, monitor->count);
+#if defined(OMR_THR_MCS_LOCKS)
+	if (monitor->jbkDebug) fprintf(stderr, "MCS_LOCKS defined\n");
+#endif
+
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
+		fprintf(stderr, "monitor_exit illegal state return\n");
+
 		return J9THREAD_ILLEGAL_MONITOR_STATE;
 	}
 
@@ -4344,6 +4370,8 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 	ASSERT(monitor->count >= 0);
 
 	if (monitor->count == 0) {
+		if (monitor->jbkDebug) fprintf(stderr, "monitor_exit clearing owner, lockedMonitorCount %lu\n", self->lockedmonitorcount);
+
 		self->lockedmonitorcount--; /* one less locked monitor on this thread */
 		monitor->owner = NULL;
 		UPDATE_JLM_MON_EXIT(self, monitor);
@@ -4376,6 +4404,8 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 		MONITOR_UNLOCK(monitor);
 #endif /* defined(OMR_THR_THREE_TIER_LOCKING) */
 	}
+
+	if (monitor->jbkDebug) fprintf(stderr, "monitor_exit normal exit\n");
 
 	return 0;
 }
@@ -5215,6 +5245,7 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	}
 
 	if (monitor->owner != self) {
+		fprintf(stderr, "self not owner! self: %llx, owner: %llx\n", (long long)self, (long long)monitor->owner);
 		ASSERT_DEBUG(0);
 		return J9THREAD_ILLEGAL_MONITOR_STATE;
 	}
@@ -5223,10 +5254,13 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	MONITOR_LOCK(monitor, CALLER_NOTIFY_ONE_OR_ALL);
 #endif
 
-	next = monitor->waiting;
+	next = monitor->waiting;	// Where does this get set?
+
+	if (monitor->jbkDebug) fprintf(stderr, "monitor_notify_original next=%llx\n", (long long)next);
+	
 	if (next) {
 		if (notifyall) {
-			monitor_notify_all_migration(monitor);
+			monitor_notify_all_migration(monitor); // XXX Was expecting to call to this
 		}
 	}
 
@@ -5253,6 +5287,8 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 #ifdef OMR_THR_THREE_TIER_LOCKING
 	MONITOR_UNLOCK(monitor);
 #endif
+
+	if (monitor->jbkDebug) fprintf(stderr, "monitor_notify_original normal exit\n");
 
 	return 0;
 }
