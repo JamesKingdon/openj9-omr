@@ -56,7 +56,7 @@ typedef enum
 	WAIT_WAIT_UNTIL_NOTIFIED_START,
 	WAIT_OMROSCOND_WAIT_BLOCK, // 13
 	WAIT_DONE_WAITING,
-	WAIT_THREAD_UNLOCK_FINAL,
+	WAIT_THREAD_UNLOCK_FINAL,	// 15
 	WAIT_INTERRUPTED_MONITOR_ENTER,
 	WAIT_EXIT,                 // 17
 	WAIT_ERROR_SHOULDNT_GET_HERE
@@ -4017,9 +4017,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 	// int isInteresting = (monitorContended || monitorAlreadyOwned) && monitor->jbkDebug;
 	// int showDebug = isInteresting || monitor->jbkDebug == 2;
 
-	int showDebug = monitor->jbkDebug == 2;
-
-	if (showDebug) {
+	if (monitor->jbkDebug == 2) {
 		fprintf(stderr, "me3t, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 	}
 
@@ -4049,7 +4047,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 		if (0 == omrthread_spinlock_acquire(self, monitor))
 #endif /* defined(OMR_THR_MCS_LOCKS) */
 		{
-			if (showDebug) fprintf(stderr, "me3t aquire, self %llx, owner %llx, count %lu\n", 
+			if (monitor->jbkDebug == 2) fprintf(stderr, "me3t aquire, self %llx, owner %llx, count %lu\n", 
 				(long long)self, (long long)monitor->owner, monitor->count);
 
 			monitor->owner = self;
@@ -4063,7 +4061,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 #if !defined(OMR_THR_MCS_LOCKS)
 		/* For MCS locks, J9THREAD_MONITOR_SPINLOCK_EXCEEDED is unused. */
 		if (J9THREAD_MONITOR_SPINLOCK_UNOWNED == omrthread_spinlock_swapState(monitor, J9THREAD_MONITOR_SPINLOCK_EXCEEDED)) {
-			if (showDebug) fprintf(stderr, "me3t exceeded, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+			if (monitor->jbkDebug == 2) fprintf(stderr, "me3t exceeded, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 
 			MONITOR_UNLOCK(monitor);
 			monitor->owner = self;
@@ -4089,7 +4087,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 #if defined(OMR_THR_MCS_LOCKS)
 				omrthread_mcs_node_free(self, mcsNode);
 #endif /* defined(OMR_THR_MCS_LOCKS) */
-				if (showDebug) fprintf(stderr, "me3t interrupted return, self %llx\n", (long long)self);
+				if (monitor->jbkDebug == 2) fprintf(stderr, "me3t interrupted return, self %llx\n", (long long)self);
 
 				return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 			}
@@ -4103,7 +4101,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 		self->monitor = monitor;
 		THREAD_UNLOCK(self);
 
-		if (showDebug) fprintf(stderr, "me3t cond wait begin, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "me3t cond wait begin, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 #if defined(OMR_THR_MCS_LOCKS)
 		if (0 != mcsNode->blocked) {
 			threadEnqueue(&monitor->blocking, self);
@@ -4119,7 +4117,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 		OMROSCOND_WAIT_LOOP();
 		threadDequeue(&monitor->blocking, self);
 #endif /* defined(OMR_THR_MCS_LOCKS) */
-		if (showDebug) fprintf(stderr, "me3t cond wait finish, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "me3t cond wait finish, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 
 		/*
 		 * Check for abort upon waking.
@@ -4135,7 +4133,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 #if defined(OMR_THR_MCS_LOCKS)
 				omrthread_mcs_node_free(self, mcsNode);
 #endif /* defined(OMR_THR_MCS_LOCKS) */
-				if (showDebug) fprintf(stderr, "me3t interrupted return 2, self %llx\n", (long long)self);
+				if (monitor->jbkDebug == 2) fprintf(stderr, "me3t interrupted return 2, self %llx\n", (long long)self);
 
 				return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 			}
@@ -4146,7 +4144,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 
 	}	// END OF THE WHILE LOOP
 
-	if (showDebug) {
+	if (monitor->jbkDebug == 2) {
 		fprintf(stderr, "me3t out of while loop, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 	}
 
@@ -4158,7 +4156,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 	 * at some point. We're no longer blocked, so clear this.
 	 */
 	if ((self->monitor != 0) || (SET_ABORTABLE == isAbortable)) {	// Doesn't this test for any monitor instead of this specific one?
-		if (showDebug) fprintf(stderr, "me3t clearing monitor, self %llx, monitor %llx\n", (long long)self, (long long)(self->monitor));
+		if (monitor->jbkDebug == 2) fprintf(stderr, "me3t clearing monitor, self %llx, monitor %llx\n", (long long)self, (long long)(self->monitor));
 
 		THREAD_LOCK(self, CALLER_MONITOR_ENTER_THREE_TIER3);
 		self->flags &= ~J9THREAD_FLAGM_BLOCKED_ABORTABLE;
@@ -4170,7 +4168,7 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 				THREAD_UNLOCK(self);
 				monitor_exit(self, monitor);
 
-				if (showDebug) fprintf(stderr, "me3t interrupted return 3, self %llx\n", (long long)self);
+				if (monitor->jbkDebug == 2) fprintf(stderr, "me3t interrupted return 3, self %llx\n", (long long)self);
 
 				return J9THREAD_INTERRUPTED_MONITOR_ENTER;
 			}
@@ -4178,16 +4176,16 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 		THREAD_UNLOCK(self);
 	}
 
-	if (showDebug) fprintf(stderr, "me3t before UPDATE_JLM..., self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "me3t before UPDATE_JLM..., self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 
 	UPDATE_JLM_MON_ENTER(self, monitor, !IS_RECURSIVE_ENTER, (blockedCount > 0));
 
-	if (showDebug) fprintf(stderr, "me3t after UPDATE_JLM..., self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "me3t after UPDATE_JLM..., self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 
 	ASSERT(!(self->flags & J9THREAD_FLAG_BLOCKED));
 	ASSERT(0 == self->monitor);
 
-	if (showDebug) fprintf(stderr, "me3t normal exit, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "me3t normal exit, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 
 
 	return 0;
@@ -4214,10 +4212,14 @@ unblock_spinlock_threads(omrthread_t self, omrthread_monitor_t monitor)
 	ASSERT(self);
 #if defined(OMR_THR_SPIN_WAKE_CONTROL)
 	i = self->library->maxWakeThreads;
+	if (monitor->jbkDebug == 2) fprintf(stderr, "unblock_spinlock_threads self=%lX, maxWake=%lu\n", (long)self, i);
 #endif /* defined(OMR_THR_SPIN_WAKE_CONTROL) */
 	ASSERT(monitor);
 
 	next = monitor->blocking;
+	if (monitor->jbkDebug == 2) fprintf(stderr, "unblock_spinlock_threads self=%lX, next=%lX\n", (long)self, (long)next);
+
+
 #if defined(OMR_THR_SPIN_WAKE_CONTROL)
 	for (; (NULL != next) && (i > 0); i--)
 #else /* defined(OMR_THR_SPIN_WAKE_CONTROL) */
@@ -4226,8 +4228,20 @@ unblock_spinlock_threads(omrthread_t self, omrthread_monitor_t monitor)
 	{
 		queue = next;
 		next = queue->next;
+		if (monitor->jbkDebug == 2) fprintf(stderr, "unblock_spinlock_threads self=%lX, notifying %lX\n", (long)self, (long)queue);
+
 		NOTIFY_WRAPPER(queue);
 		Trc_THR_ThreadSpinLockThreadUnblocked(self, queue, monitor);
+	}
+
+	if (next && monitor->jbkDebug == 2) {
+		fprintf(stderr, "unblock_spinlock_threads self=%lX, skipping threads ", (long)self);
+		omrthread_t p = next;
+		while(p) {
+			fprintf(stderr, "%lX ", (long)p);
+			p = p->next;
+		}
+		fprintf(stderr, "\n");
 	}
 }
 
@@ -4414,11 +4428,9 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 	ASSERT(self);
 	ASSERT(0 == self->monitor);
 
-	int showDebug = (monitor->jbkDebug == 2);
-
-	if (showDebug) fprintf(stderr, "monitor_exit, self %llx, owner %llx, count %lu\n", (long long)self, (long long)monitor->owner, monitor->count);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit, self %llx, owner %llx, count %lu\n", (long long)self, (long long)monitor->owner, monitor->count);
 #if defined(OMR_THR_MCS_LOCKS)
-	if (showDebug) fprintf(stderr, "MCS_LOCKS defined\n");
+	if (monitor->jbkDebug == 2) fprintf(stderr, "MCS_LOCKS defined\n");
 #endif
 
 	if (monitor->owner != self) {
@@ -4429,10 +4441,10 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 	}
 
 	monitor->count--;
-	ASSERT(monitor->count >= 0);
+	ASSERT(monitor->count >= 0);	// it's unsigned, this can never fail or detect wrapping
 
 	if (monitor->count == 0) {
-		if (showDebug) fprintf(stderr, "monitor_exit clearing owner, lockedMonitorCount %lu, self %llx\n", self->lockedmonitorcount, (long long)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit clearing owner, lockedMonitorCount %lu, self %llx\n", self->lockedmonitorcount, (long long)self);
 
 		self->lockedmonitorcount--; /* one less locked monitor on this thread */
 		monitor->owner = NULL;
@@ -4467,7 +4479,7 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 #endif /* defined(OMR_THR_THREE_TIER_LOCKING) */
 	}
 
-	if (showDebug) fprintf(stderr, "monitor_exit normal exit, self %llx\n", (long long)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit normal exit, self %llx\n", (long long)self);
 
 	return 0;
 }
@@ -4651,13 +4663,10 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	ASSERT(monitor);
 	ASSERT(FREE_TAG != monitor->count);
 
-	int showDebug = (monitor->jbkDebug == 2);
-
-
 	// Track the progress of the iprofiler thread in the 'checkpoint variable
 	if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_START;
 
-	if (showDebug) fprintf(stderr, "wait_orig start, self %lX\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig start, self %lX\n", (long int)self);
 
 	if (monitor->owner != self) {
 		fprintf(stderr, "wait_orig, not owner, illegal state return! self %lX, owner %lX\n", (long int)self, (long int)monitor->owner);
@@ -4692,7 +4701,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 
 	if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_THREAD_LOCKED;
 
-	if (showDebug) fprintf(stderr, "wait_orig, %lX inside thread lock\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX inside thread lock\n", (long int)self);
 
 	/*
 	 * Before we wait, check if we've already been interrupted
@@ -4701,7 +4710,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	if (intrFlags & J9THREAD_FLAG_INTERRUPTED) {
 		self->flags &= ~J9THREAD_FLAG_INTERRUPTED;
 		THREAD_UNLOCK(self);
-		fprintf(stderr, "wait_orig, self %lX interrupted 1\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, self %lX interrupted 1\n", (long int)self);
 		if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_INTERRUPTED;
 
 		return J9THREAD_INTERRUPTED;
@@ -4709,7 +4718,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	if (intrFlags & J9THREAD_FLAG_PRIORITY_INTERRUPTED) {
 		self->flags &= ~J9THREAD_FLAG_PRIORITY_INTERRUPTED;
 		THREAD_UNLOCK(self);
-		fprintf(stderr, "wait_orig, self %lX interrupted 2\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, self %lX interrupted 2\n", (long int)self);
 		if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_PRIORITY_INTERRUPTED;
 
 		return J9THREAD_PRIORITY_INTERRUPTED;
@@ -4717,7 +4726,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	if (intrFlags & J9THREAD_FLAG_ABORTED) {
 		/* don't clear the flag */
 		THREAD_UNLOCK(self);
-		fprintf(stderr, "wait_orig, self %lX interrupted 3\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, self %lX interrupted 3\n", (long int)self);
 		if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_ABORTED;
 
 		return J9THREAD_PRIORITY_INTERRUPTED;
@@ -4733,7 +4742,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 
 	if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_THREAD_UNLOCKED;
 
-	if (showDebug) fprintf(stderr, "wait_orig, %lX after thread unlock\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX after thread unlock\n", (long int)self);
 
 
 #if defined(OMR_THR_JLM_HOLD_TIMES)
@@ -4773,7 +4782,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 		/*
 		 * TIMED WAIT
 		 */
-		if (showDebug) fprintf(stderr, "wait_orig, %lX timed wait\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX timed wait\n", (long int)self);
 		if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_OMROSCOND_TIMED_WAIT;
 
 		intptr_t boundedMillis = BOUNDED_I64_TO_IDATA(millis);
@@ -4807,14 +4816,14 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 		}
 		OMROSCOND_WAIT_TIMED_LOOP();
 
-		if (showDebug) fprintf(stderr, "wait_orig, %lX timed wait finished, timedout=%lu\n", (long int)self, timedOut);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX timed wait finished, timedout=%lu\n", (long int)self, timedOut);
 
 
 	} else {
 		/*
 		 * WAIT UNTIL NOTIFIED, NO TIMEOUT
 		 */
-		if (showDebug) fprintf(stderr, "wait_orig, %lX about to loop\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX about to loop\n", (long int)self);
 		if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_OMROSCOND_WAIT_BLOCK;
 
 		ASSERT_MONITOR_UNOWNED_IF_NOT_3TIER(monitor);
@@ -4832,7 +4841,7 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 			THREAD_UNLOCK(self);
 		OMROSCOND_WAIT_LOOP();
 
-		if (showDebug) fprintf(stderr, "wait_orig, %lX out of loop\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX out of loop\n", (long int)self);
 	}
 
 	/* DONE WAITING AT THIS POINT */
@@ -4902,15 +4911,15 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 
 
 #ifdef OMR_THR_THREE_TIER_LOCKING
-	if (showDebug) fprintf(stderr, "wait_orig, %lX calling monitor_enter_three_tier...\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX calling monitor_enter_three_tier...\n", (long int)self);
 
-	if (monitor_enter_three_tier(
+	if (monitor_enter_three_tier(						// One failure mode is for this call to hang
 			self, monitor,
 			(BOOLEAN)((interruptible & J9THREAD_FLAG_ABORTABLE)? SET_ABORTABLE: DONT_SET_ABORTABLE))
 		== J9THREAD_INTERRUPTED_MONITOR_ENTER
 	) {
 		/* we don't own the monitor */
-		if (showDebug) fprintf(stderr, "wait_orig, %lX ret int mon enter\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX ret int mon enter\n", (long int)self);
 		if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_INTERRUPTED_MONITOR_ENTER;
 
 		return J9THREAD_INTERRUPTED_MONITOR_ENTER;
@@ -4919,11 +4928,11 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	monitor->owner = self;
 	UPDATE_JLM_MON_ENTER(self, monitor, !IS_RECURSIVE_ENTER, IS_SLOW_ENTER);
 #endif
-	if (showDebug) fprintf(stderr, "wait_orig, %lX resetting count from %lu to %ld\n", (long int)self, monitor->count, count);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX resetting count from %lu to %ld\n", (long int)self, monitor->count, count);
 
 	monitor->count = count;
 
-	if (showDebug) fprintf(stderr, "wait_orig, %lX exiting\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX exiting\n", (long int)self);
 
 	if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_EXIT;
 
@@ -4940,23 +4949,23 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	ASSERT(NULL == self->next);
 
 	if (priorityinterrupted) {
-		if (showDebug) fprintf(stderr, "wait_orig, %lX ret P INT\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX ret P INT\n", (long int)self);
 		return J9THREAD_PRIORITY_INTERRUPTED;
 	}
 	if (notified) {
-		if (showDebug) fprintf(stderr, "wait_orig, %lX ret 0\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX ret 0\n", (long int)self);
 		return 0;
 	}
 	if (interrupted) {
-		if (showDebug) fprintf(stderr, "wait_orig, %lX ret INT\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX ret INT\n", (long int)self);
 		return J9THREAD_INTERRUPTED;
 	}
 	if (timedOut) {
-		if (showDebug) fprintf(stderr, "wait_orig, %lX ret timeout\n", (long int)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX ret timeout\n", (long int)self);
 		return J9THREAD_TIMED_OUT;
 	}
 	ASSERT(0);
-	if (showDebug) fprintf(stderr, "wait_orig, %lX shouldn't get here\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX shouldn't get here\n", (long int)self);
 	if (self == jbkIprofilerThread) iprofiler_wait_checkpoint = WAIT_ERROR_SHOULDNT_GET_HERE;
 
 	return 0;
@@ -4980,9 +4989,7 @@ monitor_wait_three_tier(omrthread_t self, omrthread_monitor_t monitor,
 	ASSERT(monitor);
 	ASSERT(FREE_TAG != monitor->count);
 
-	int showDebug = (monitor->jbkDebug == 2);
-
-	if (showDebug) fprintf(stderr, "wait_3T, self %lX\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_3T, self %lX\n", (long int)self);
 
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
@@ -5380,9 +5387,7 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	ASSERT(self);
 	ASSERT(monitor);
 
-	int showDebug = (monitor->jbkDebug == 2);
-
-	if (showDebug) {
+	if (monitor->jbkDebug == 2) {
 		fprintf(stderr, "monitor_notify_original, self=%llX all=%d\n", (unsigned long long)self, notifyall);
 		fprintf(stderr, "last iprofiler wait checkpoint is %u\n", iprofiler_wait_checkpoint);
 	}
@@ -5400,14 +5405,14 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 
 	next = monitor->waiting;	// Where does this get set?
 
-	if (showDebug) fprintf(stderr, "monitor_notify_original, self=%llX next=%llx\n", (unsigned long long)self, (long long)next);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_original, self=%llX next=%llx\n", (unsigned long long)self, (long long)next);
 	
 	if (next) {
 		if (notifyall) {
 			monitor_notify_all_migration(monitor); // XXX Was expecting to call to this
 		}
 	} else {
-		if (showDebug) fprintf(stderr, "monitor_notify_original, self=%llX next is NULL\n", (unsigned long long)self);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_original, self=%llX next is NULL\n", (unsigned long long)self);
 	}
 
 	// Investigate how common nWaiting > 1 is. Answer - fairly common.
@@ -5427,15 +5432,15 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	while (next) {
 		queue = next;
 		next = queue->next;
-		if (showDebug) fprintf(stderr, "monitor_notify_original, self %lX checking thread %llX\n", (long)self, (long long int)queue);
+		if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_original, self %lX checking thread %llX\n", (long)self, (long long int)queue);
 		THREAD_LOCK(queue, CALLER_NOTIFY_ONE_OR_ALL);
 		if (queue->flags & J9THREAD_FLAG_WAITING) {
-			if (showDebug) fprintf(stderr, "monitor_notify_original, self %lX calling threadNotify\n", (long)self);
+			if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_original, self %lX calling threadNotify\n", (long)self);
 			threadNotify(queue);
 			Trc_THR_ThreadMonitorNotifyThreadNotified(self, queue, monitor);
 			someoneNotified = 1;
 		} else {
-			if (showDebug || queue == jbkIprofilerThread) 
+			if (monitor->jbkDebug == 2 || queue == jbkIprofilerThread) 
 				fprintf(stderr, "monitor_notify_original, self %lX flag_waiting not set for %lX\n", (long)self, (long)queue);
 		}
 		THREAD_UNLOCK(queue);
@@ -5449,7 +5454,7 @@ monitor_notify_original(omrthread_t self, omrthread_monitor_t monitor, int notif
 	MONITOR_UNLOCK(monitor);
 #endif
 
-	if (showDebug) fprintf(stderr, "monitor_notify_original normal exit, self=%llx\n", (unsigned long long)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_original normal exit, self=%llx\n", (unsigned long long)self);
 
 	return 0;
 }
@@ -5463,9 +5468,7 @@ monitor_notify_three_tier(omrthread_t self, omrthread_monitor_t monitor, int not
 	ASSERT(self);
 	ASSERT(monitor);
 
-	int showDebug = (monitor->jbkDebug == 2);
-
-	if (showDebug) {
+	if (monitor->jbkDebug == 2) {
 		fprintf(stderr, "monitor_notify_3T, self=%llX all=%d\n", (unsigned long long)self, notifyall);
 	}
 
@@ -5783,14 +5786,12 @@ monitor_notify_all_migration(omrthread_monitor_t monitor)
 	omrthread_t waiting, wtail;
 	omrthread_t notifyAllWaiting, nawtail;
 
-	int showDebug = (monitor->jbkDebug == 2);
-
-	// if (showDebug) fprintf(stderr, "monitor_notify_all_migration entry\n");
+	// if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_all_migration entry\n");
 
 	notifyAllWaiting = monitor->notifyAllWaiting;
 	waiting = monitor->waiting;
 
-	if (showDebug) fprintf(stderr, "monitor_notify_all_migration: notifyAllWaiting %llX, waiting %llX\n", (long long int)notifyAllWaiting, (long long int)waiting);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_all_migration: notifyAllWaiting %llX, waiting %llX\n", (long long int)notifyAllWaiting, (long long int)waiting);
 
 	if (notifyAllWaiting) {
 		/* Append the waiters to those currently notifyAll'ed */
@@ -5807,7 +5808,7 @@ monitor_notify_all_migration(omrthread_monitor_t monitor)
 	}
 	monitor->waiting = NULL;
 
-	// if (showDebug) fprintf(stderr, "monitor_notify_all_migration exit\n");
+	// if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_notify_all_migration exit\n");
 }
 
 /**

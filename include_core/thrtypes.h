@@ -64,7 +64,7 @@ typedef struct J9ThreadMonitor {
 	J9_ABSTRACT_MONITOR_FIELDS
 	J9OSMutex mutex;
 	struct J9Thread *notifyAllWaiting;
-	int jbkDebug;
+	volatile int jbkDebug;
 } J9ThreadMonitor;
 
 
