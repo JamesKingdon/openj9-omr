@@ -4010,24 +4010,9 @@ monitor_enter_three_tier(omrthread_t self, omrthread_monitor_t monitor, BOOLEAN 
 {
 	int blockedCount = 0;
 
-	// This was useful for determining that contended monitors are fairly common during normal operation,
-	// but creates too much output to give to the customer.
-	// int monitorContended = monitor->owner != 0;
-	// int monitorAlreadyOwned = monitor->owner == self;
-	// int isInteresting = (monitorContended || monitorAlreadyOwned) && monitor->jbkDebug;
-	// int showDebug = isInteresting || monitor->jbkDebug == 2;
-
 	if (monitor->jbkDebug == 2) {
 		fprintf(stderr, "me3t, self %llx, owner %llx\n", (long long)self, (long long)monitor->owner);
 	}
-
-	// if (monitorContended) {
-	// 	fprintf(stderr, "CONTENDED\n");
-	// }
-
-	// if (monitorAlreadyOwned) {
-	// 	fprintf(stderr, "ALREADY OWNED\n");
-	// }
 
 #if defined(OMR_THR_MCS_LOCKS)
 	omrthread_mcs_node_t mcsNode = omrthread_mcs_node_allocate(self);
