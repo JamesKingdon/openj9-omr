@@ -64,8 +64,6 @@ typedef enum
 
 static jbk_wait_checkpoint_t iprofiler_wait_checkpoint = WAIT_EXIT;
 
-
-
 static void omrthread_shutdown(void);
 
 static omrthread_t threadAllocate(omrthread_library_t lib, int globalIsLocked);
@@ -4405,6 +4403,9 @@ omrthread_monitor_exit_using_threadId(omrthread_monitor_t monitor, omrthread_t t
 static intptr_t
 monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 {
+	// XXX replace with a static 
+	int jbkAlwaysUnblock = (getenv("TR_AlwaysUnblockSpinlocks") != NULL);
+
 #if defined(OMR_THR_MCS_LOCKS)
 	omrthread_t nextThread = NULL;
 #endif /* defined(OMR_THR_MCS_LOCKS) */
@@ -4447,13 +4448,22 @@ monitor_exit(omrthread_t self, omrthread_monitor_t monitor)
 #if defined(OMR_THR_SPIN_WAKE_CONTROL)
 		omrthread_spinlock_swapState(monitor, J9THREAD_MONITOR_SPINLOCK_UNOWNED);
  		MONITOR_LOCK(monitor, CALLER_MONITOR_EXIT1);
- 		if (0 == monitor->spinThreads) {
+		// spinThreads is incremented and decremented in threadhelpers.cpp
+		// Let's get some debug for spinThreads
+		if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit spinThreads %lu, self %llx\n", monitor->spinThreads, (long long)self);
+
+ 		if (0 == monitor->spinThreads) {			// XXX is this a safe optimisation? The hanging cases don't call unblock' at all
+			if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit calling unblock A. spinThreads %lu, self %llx\n", monitor->spinThreads, (long long)self);
  			unblock_spinlock_threads(self, monitor);
- 		}
+ 		} else if (jbkAlwaysUnblock) {
+			if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit TEST MODE calling unblock. spinThreads %lu, self %llx\n", monitor->spinThreads, (long long)self);
+			unblock_spinlock_threads(self, monitor);
+		}
  		MONITOR_UNLOCK(monitor);
 #else /* defined(OMR_THR_SPIN_WAKE_CONTROL) */
 		if (J9THREAD_MONITOR_SPINLOCK_EXCEEDED == omrthread_spinlock_swapState(monitor, J9THREAD_MONITOR_SPINLOCK_UNOWNED)) {
 			MONITOR_LOCK(monitor, CALLER_MONITOR_EXIT1);
+			if (monitor->jbkDebug == 2) fprintf(stderr, "monitor_exit calling unblock B. spinThreads %lu, self %llx\n", monitor->spinThreads, (long long)self);
 			unblock_spinlock_threads(self, monitor);
 			MONITOR_UNLOCK(monitor);
 		}
@@ -4645,6 +4655,10 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 	omrthread_t nextThread = NULL;
 #endif /* defined(OMR_THR_MCS_LOCKS) */
 
+	// XXX replace with static
+	int jbkAlwaysUnblock = (getenv("TR_AlwaysUnblockSpinlocks") != NULL);
+
+
 	ASSERT(monitor);
 	ASSERT(FREE_TAG != monitor->count);
 
@@ -4749,10 +4763,15 @@ monitor_wait_original(omrthread_t self, omrthread_monitor_t monitor,
 #if defined(OMR_THR_SPIN_WAKE_CONTROL)
 	omrthread_spinlock_swapState(monitor, J9THREAD_MONITOR_SPINLOCK_UNOWNED);
 	if (0 == monitor->spinThreads) {
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX calling unblock_spinlock_threads A, spinThreads=%lu\n", (long int)self, monitor->spinThreads);
+		unblock_spinlock_threads(self, monitor);
+	} else if (jbkAlwaysUnblock) {
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX TEST MODE calling unblock_spinlock_threads, spinThreads=%lu\n", (long int)self, monitor->spinThreads);
 		unblock_spinlock_threads(self, monitor);
 	}
 #else /* defined(OMR_THR_SPIN_WAKE_CONTROL) */
 	if (J9THREAD_MONITOR_SPINLOCK_EXCEEDED == omrthread_spinlock_swapState(monitor, J9THREAD_MONITOR_SPINLOCK_UNOWNED)) {
+		if (monitor->jbkDebug == 2) fprintf(stderr, "wait_orig, %lX calling unblock_spinlock_threads B, spinThreads=%lu\n", (long int)self, monitor->spinThreads);
 		unblock_spinlock_threads(self, monitor);
 	}
 #endif  /* defined(OMR_THR_SPIN_WAKE_CONTROL) */
@@ -4974,7 +4993,7 @@ monitor_wait_three_tier(omrthread_t self, omrthread_monitor_t monitor,
 	ASSERT(monitor);
 	ASSERT(FREE_TAG != monitor->count);
 
-	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_3T, self %lX\n", (long int)self);
+	if (monitor->jbkDebug == 2) fprintf(stderr, "wait_3T, self %lX\n", (long int)self); // Not seen in debug
 
 	if (monitor->owner != self) {
 		ASSERT_DEBUG(0);
@@ -5286,6 +5305,9 @@ omrthread_monitor_notify_all(omrthread_monitor_t monitor)
 
 void omrthread_monitor_setJbkDebug(omrthread_monitor_t monitor, int x)
 {
+	// XXX replace with a static 
+	int jbkAlwaysUnblock = (getenv("TR_AlwaysUnblockSpinlocks") != NULL);
+
 	switch (x)
 	{
 		case 0:	// debug off
@@ -5310,11 +5332,14 @@ void omrthread_monitor_setJbkDebug(omrthread_monitor_t monitor, int x)
 			}
 			jbkIprofilerThread = self;
 			fprintf(stderr, "Debug IprofilerThread saved: %lx\n", (long int)jbkIprofilerThread);
+			
+			if (jbkAlwaysUnblock) fprintf(stderr, "TR_AlwaysUnblockSpinlocks set\n");
+
 		}
 		break;
 
 		default:
-			fprintf(stderr, "seJbkDebug: unknown debug value %d\n", x);
+			fprintf(stderr, "setJbkDebug: unknown debug value %d\n", x);
 			break;
 	}
 }
