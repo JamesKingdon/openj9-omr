@@ -3709,6 +3709,14 @@ monitor_free_nolock(omrthread_library_t lib, omrthread_t thread, omrthread_monit
 static intptr_t
 monitor_init(omrthread_monitor_t monitor, uintptr_t flags, omrthread_library_t lib, const char *name)
 {
+	static int jbkTestBuildInfo = 0;
+
+	// XXX Temporary debug so that we can confirm the test build is correctly installed
+	if (!jbkTestBuildInfo) {
+		fprintf(stderr, "TestBuild for OMR 7878\n");
+		jbkTestBuildInfo = 1;
+	}
+
 	ASSERT(monitor);
 	ASSERT(lib);
 
