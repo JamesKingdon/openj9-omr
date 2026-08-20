@@ -1193,7 +1193,26 @@ TR::Register *OMR::CodeGenerator::allocateSinglePrecisionRegister(TR_RegisterKin
 
 void OMR::CodeGenerator::apply8BitLabelRelativeRelocation(int32_t *cursor, TR::LabelSymbol *label)
 {
+    int8_t initial = *(int8_t *)cursor;
+
+    int8_t jmpOffset = *(int8_t *)cursor + (int8_t)(intptr_t)label->getCodeLocation();
+
     *(int8_t *)cursor += (int8_t)(intptr_t)label->getCodeLocation();
+
+    // I don't understand why we are adding an 8 bit wrap of the target to something that was stored at the cursor. Why can't we just
+    // calculate the distance in the obvious way?
+    int32_t distance = ((int32_t)((intptr_t)label->getCodeLocation() - (intptr_t)cursor))-1; // -1 because the delta is calculated from the address after the jmp instruction's immediate value
+
+    // These two values appear to be the same in all working cases:
+    if (distance != (int32_t)jmpOffset) {
+        // fprintf(stderr, "XXX initial %d, jmpOffset %d, distance=%d\n", initial, jmpOffset, distance);
+        if (self()->comp()->getOption(TR_TraceCG))
+            traceMsg(self()->comp(), "XXX initial %d, jmpOffset %d, distance=%d\n", initial, jmpOffset, distance);
+    }
+
+    TR_ASSERT_FATAL(distance >= -128 && distance <= 127, "8-bit label relative relocation distance out of range: distance=%d, cursor=%p, label=%p", (int)distance, cursor, label->getCodeLocation());
+    // *(int8_t *)cursor = (int8_t)distance;
+
 }
 
 void OMR::CodeGenerator::apply12BitLabelRelativeRelocation(int32_t *cursor, TR::LabelSymbol *label, bool isCheckDisp)
@@ -1204,12 +1223,22 @@ void OMR::CodeGenerator::apply12BitLabelRelativeRelocation(int32_t *cursor, TR::
 void OMR::CodeGenerator::apply16BitLabelRelativeRelocation(int32_t *cursor, TR::LabelSymbol *label)
 {
     *(int16_t *)cursor += (int16_t)(intptr_t)label->getCodeLocation();
+
+    // int32_t distance = (int32_t)((intptr_t)label->getCodeLocation() + *(int16_t *)cursor);
+    // TR_ASSERT_FATAL(distance >= -32768 && distance <= 32767, "16-bit label relative relocation distance out of range: distance=%d, cursor=%p, label=%p", (int)distance, cursor, label->getCodeLocation());
+    // *(int16_t *)cursor = (int16_t)distance;
+
 }
 
 void OMR::CodeGenerator::apply16BitLabelRelativeRelocation(int32_t *cursor, TR::LabelSymbol *label, int8_t d,
     bool isInstrOffset)
 {
     *(int16_t *)cursor += (int16_t)(intptr_t)label->getCodeLocation();
+
+    // int32_t distance = (int32_t)((intptr_t)label->getCodeLocation() + *(int16_t *)cursor);
+    // TR_ASSERT_FATAL(distance >= -32768 && distance <= 32767, "16-bit label relative relocation distance out of range: distance=%d, cursor=%p, label=%p", (int)distance, cursor, label->getCodeLocation());
+    // *(int16_t *)cursor = (int16_t)distance;
+
 }
 
 void OMR::CodeGenerator::apply24BitLabelRelativeRelocation(int32_t *cursor, TR::LabelSymbol *)

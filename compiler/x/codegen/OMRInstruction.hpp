@@ -104,6 +104,15 @@ protected:
         TR::InstOpCode::Mnemonic op = TR::InstOpCode::bad, bool flag = false);
 
 public:
+    /**
+     * @brief Helper method to trace estimated binary length for debugging
+     *
+     * This method outputs trace information about the estimated binary length
+     * of an instruction when TR_TraceCG option is enabled. It should be called
+     * by estimateBinaryLength() implementations after setting the estimated length.
+     */
+    void traceEstimatedBinaryLength();
+
     virtual const char *description() { return "X86"; }
 
     virtual Kind getKind() { return IsNotExtended; }

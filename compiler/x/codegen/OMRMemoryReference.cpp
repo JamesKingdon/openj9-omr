@@ -771,6 +771,11 @@ void OMR::X86::MemoryReference::assignRegisters(TR::Instruction *currentInstruct
 
 uint32_t OMR::X86::MemoryReference::estimateBinaryLength(TR::CodeGenerator *cg)
 {
+    return self()->estimateBinaryLength(NULL, cg);
+}
+
+uint32_t OMR::X86::MemoryReference::estimateBinaryLength(TR::Instruction *containingInstruction, TR::CodeGenerator *cg)
+{
     if (self()->getBaseRegister()
         && toRealRegister(self()->getBaseRegister())->getRegisterNumber() == TR::RealRegister::vfp) {
         // Rewrite VFP-relative memref in terms of an actual register
@@ -778,6 +783,11 @@ uint32_t OMR::X86::MemoryReference::estimateBinaryLength(TR::CodeGenerator *cg)
         _baseRegister = cg->machine()->getRealRegister(cg->vfpState()._register);
         self()->getSymbolReference().setOffset(self()->getSymbolReference().getOffset() + cg->vfpState()._displacement);
     }
+
+    bool isEvex = containingInstruction
+        && (containingInstruction->getOpCode().info().isEvex()
+            || (containingInstruction->getEncodingMethod() >= OMR::X86::EVEX_L128
+                && containingInstruction->getEncodingMethod() <= OMR::X86::EVEX_L512));
 
     TR::RealRegister *base = toRealRegister(self()->getBaseRegister());
 
@@ -818,9 +828,10 @@ uint32_t OMR::X86::MemoryReference::estimateBinaryLength(TR::CodeGenerator *cg)
 
         case 5:
             displacement = self()->getDisplacement();
-            if (displacement == 0 && !base->needsDisp() && !base->needsSIB() && !self()->isForceWideDisplacement()) {
+            if (displacement == 0 && !base->needsDisp() && !base->needsSIB() && !self()->isForceWideDisplacement()
+                && !isEvex) {
                 length = 0;
-            } else if (displacement >= -128 && displacement <= 127 && !self()->isForceWideDisplacement()) {
+            } else if (displacement >= -128 && displacement <= 127 && !self()->isForceWideDisplacement() && !isEvex) {
                 length = 1;
             } else {
                 // If there is a symbol or if the displacement will not fit in a byte,
@@ -836,7 +847,7 @@ uint32_t OMR::X86::MemoryReference::estimateBinaryLength(TR::CodeGenerator *cg)
 
         case 7:
             displacement = self()->getDisplacement();
-            if (displacement >= -128 && displacement <= 127 && !self()->isForceWideDisplacement()) {
+            if (displacement >= -128 && displacement <= 127 && !self()->isForceWideDisplacement() && !isEvex) {
                 length = 2;
             } else {
                 // If there is a symbol or if the displacement will not fit in a byte,
@@ -852,12 +863,22 @@ uint32_t OMR::X86::MemoryReference::estimateBinaryLength(TR::CodeGenerator *cg)
 
 uint32_t OMR::X86::MemoryReference::getBinaryLengthLowerBound(TR::CodeGenerator *cg)
 {
+    return self()->getBinaryLengthLowerBound(NULL, cg);
+}
+
+uint32_t OMR::X86::MemoryReference::getBinaryLengthLowerBound(TR::Instruction *containingInstruction, TR::CodeGenerator *cg)
+{
     intptr_t displacement;
     uint32_t addressTypes = (self()->getBaseRegister() != NULL ? 1 : 0) | (self()->getIndexRegister() != NULL ? 2 : 0)
         | ((self()->getSymbolReference().getSymbol() != NULL || self()->getSymbolReference().getOffset() != 0
                || self()->isForceWideDisplacement())
                 ? 4
                 : 0);
+
+    bool isEvex = containingInstruction
+        && (containingInstruction->getOpCode().info().isEvex()
+            || (containingInstruction->getEncodingMethod() >= OMR::X86::EVEX_L128
+                && containingInstruction->getEncodingMethod() <= OMR::X86::EVEX_L512));
 
     uint32_t length = 0;
     TR::RealRegister::RegNum registerNumber = TR::RealRegister::NoReg;
@@ -901,9 +922,10 @@ uint32_t OMR::X86::MemoryReference::getBinaryLengthLowerBound(TR::CodeGenerator 
         case 5:
             displacement = self()->getDisplacement();
 
-            if (displacement == 0 && !base->needsDisp() && !base->needsSIB() && !self()->isForceWideDisplacement()) {
+            if (displacement == 0 && !base->needsDisp() && !base->needsSIB() && !self()->isForceWideDisplacement()
+                && !isEvex) {
                 length = 0;
-            } else if (displacement >= -128 && displacement <= 127 && !self()->isForceWideDisplacement()) {
+            } else if (displacement >= -128 && displacement <= 127 && !self()->isForceWideDisplacement() && !isEvex) {
                 if (displacement != 0)
                     length = 1;
             } else
@@ -920,7 +942,7 @@ uint32_t OMR::X86::MemoryReference::getBinaryLengthLowerBound(TR::CodeGenerator 
 
         case 7:
             displacement = self()->getDisplacement();
-            if (!self()->isForceWideDisplacement())
+            if (!self()->isForceWideDisplacement() && !isEvex)
                 length = 2;
             else
                 length = 5;
